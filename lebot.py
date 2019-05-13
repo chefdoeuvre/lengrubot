@@ -7,7 +7,60 @@ import telebot
 import time
 from datetime import datetime,timedelta
 
-rules = ''' Hello!
+def langlevel(level):
+   result = '['+('#'*level) + ('-' *(5-level))+']'
+   return result
+
+bot = telebot.TeleBot(config.token)	
+
+# command
+# /info [username]  -- info about one username
+# /list             -- list all username with info (потом, в этйо команде особо нет необходимости)
+# /me               -- list info about me
+# запрос инфы для нового пользователя и добавление в БД
+# вывод инфы
+# /list инфа о юзерах в базе
+# /debug 1 инфа по базе по номеру записи
+
+markuplang = telebot.types.InlineKeyboardMarkup()
+markuplevel = telebot.types.InlineKeyboardMarkup()
+markupgmt = telebot.types.InlineKeyboardMarkup()
+#create buttons for eng ru
+markuplang.row(
+    telebot.types.InlineKeyboardButton("English", callback_data="lang=English"),
+    telebot.types.InlineKeyboardButton("Russian", callback_data="lang=Russian")
+    )
+# create buttons for lang level    
+markuplevel.add(
+    #*[telebot.types.InlineKeyboardButton(str(i), callback_data="level="+str(i)) for i in range(0,6,1)]
+    telebot.types.InlineKeyboardButton("A2", callback_data="level=A2"),
+    telebot.types.InlineKeyboardButton("B1", callback_data="level=B1"),
+    telebot.types.InlineKeyboardButton("B2", callback_data="level=B2"),
+    telebot.types.InlineKeyboardButton("C1", callback_data="level=C1"),
+    telebot.types.InlineKeyboardButton("C2", callback_data="level=C2")
+    )
+#create buttons for UTC
+for j in range(-14,12,8):
+    markupgmt.row(*[telebot.types.InlineKeyboardButton(str(i), callback_data="utc="+str(i)) for i in range(j,13,1)])
+
+@bot.message_handler(commands=['list'])
+def send_message(message):
+    if message.from_user.id == 87250032:
+        db_worker = SQLighter(config.database_name)
+        Everyone = db_worker.ListAll()
+        db_worker.close()
+        response = 'User count: '+ str(len(Everyone))+"\n"
+        for line in Everyone:
+            response = response+str(line)+"\n"
+        bot.send_message(message.from_user.id, response)
+
+@bot.message_handler(commands=['start'])
+def test_message(message):
+    bot.send_message(message.from_user.id, "Choose your native (main) language", reply_markup = markuplang)
+
+@bot.message_handler(commands=['rules'])
+def send_message(message):      
+        rules = ''' Hello!
 Both languages are allowed.
 Feel free to ask, if you do not understand something in a conversation.
 Don't be rude
@@ -26,47 +79,13 @@ Native speakers are welcomed here. Please help us, like we help you. Thank you.
 
 ================
 Bot added to chat. 
-write @lengrubot and press start to fill your profile.
+write PM @lengrubot and press start to fill your profile. (or PM /start )
 /me - for info about you
 /info [nickname] - about anyone else.
 #bot_info
 ================
 '''
-
-def langlevel(level):
-   result = '['+('#'*level) + ('-' *(5-level))+']'
-   return result
-
-bot = telebot.TeleBot(config.token)	
-
-# command
-# /info [username]  -- info about one username
-# /list             -- list all username with info (потом, в этйо команде особо нет необходимости)
-# /me               -- list info about me
-# запрос инфы для нового пользователя и добавление в БД
-# вывод инфы
-
-markuplang = telebot.types.InlineKeyboardMarkup()
-markuplevel = telebot.types.InlineKeyboardMarkup()
-markupgmt = telebot.types.InlineKeyboardMarkup()
-#create buttons for eng ru
-markuplang.row(
-    telebot.types.InlineKeyboardButton("English", callback_data="lang=English"),
-    telebot.types.InlineKeyboardButton("Russian", callback_data="lang=Russian")
-    )
-# create buttons for lang level    
-markuplevel.row(*[telebot.types.InlineKeyboardButton(str(i), callback_data="level="+str(i)) for i in range(0,6,1)])
-#create buttons for UTC
-for j in range(-14,12,8):
-    markupgmt.row(*[telebot.types.InlineKeyboardButton(str(i), callback_data="utc="+str(i)) for i in range(j,13,1)])
-
-@bot.message_handler(commands=['start'])
-def test_message(message):
-    bot.send_message(message.from_user.id, "Choose your native (main) language", reply_markup = markuplang)
-
-#@bot.message_handler(commands=['rules'])
-#def send_message(message):      
-#        bot.send_message(message.chat.id,rules)
+        bot.send_message(message.chat.id,rules)
 
 
 @bot.message_handler(commands=['me'])
@@ -78,16 +97,18 @@ def send_messages(message):
     if user_UTC is None: 
         user_time = "Unknown"
     else:
-        user_time = (datetime.utcnow() + timedelta(hours=user_UTC)).strftime("%H:%M")
+        user_time = str((datetime.utcnow() + timedelta(hours=user_UTC)).strftime("%H:%M"))
     if user_level is None:
         user_level = "Unknown"
-    else:
-        user_level = langlevel(user_level)
+   # else:
+    #    user_level = langlevel(user_level)
     if user_username == "None":
         user_username = str(message.from_user.first_name) + " "+ str(message.from_user.last_name)
     else:
         user_username = "@"+user_username
-    response = str(user_username)+' is '+str(user_lang)+' native speaker. Other language level is '+user_level+'. Current time: '+user_time
+    if user_lang == 'English': other_lang = 'Russian' 
+    else: other_lang = 'English' 
+    response = str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
     bot.send_message(message.chat.id, response) 
 
 @bot.message_handler(commands=['info'])
@@ -101,12 +122,14 @@ def send_messages(message):
         if user_UTC is None: 
             user_time = "Unknown"
         else:
-            user_time = (datetime.utcnow() + timedelta(hours=user_UTC)).strftime("%H:%M")
+            user_time = str((datetime.utcnow() + timedelta(hours=user_UTC)).strftime("%H:%M"))
         if user_level is None:
             user_level = "Unknown"
-        else:
-            user_level = langlevel(user_level)
-        response = '@'+str(user_username)+' is '+str(user_lang)+' native speaker. Other language level is '+user_level+'. Current time: '+user_time.strftime("%H:%M")
+        #else:
+        #    user_level = langlevel(user_level)
+        if user_lang == 'English': other_lang = 'Russian' 
+        else: other_lang = 'English' 
+        response = '@'+str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
     else:
         response = 'User '+username+ " does not exists."        
     db_worker.close()

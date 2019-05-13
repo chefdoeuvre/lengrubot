@@ -27,11 +27,18 @@ class SQLighter:
            usernameresult = self.cursor.execute(command).fetchall()
         if len(idresult) == 0:
            self.AddUserFirstTime(id,username)
+        else:
+           command = 'UPDATE "USERS" SET "username" = "'+str(username)+'" WHERE "id" = "'+str(id)+'"'
+           result = self.cursor.execute(command).fetchall()
         return len(usernameresult)
     
     def WhoAmI(self,id):
         with self.connection:
             return self.cursor.execute('SELECT * FROM "USERS" WHERE id = ?', (id,)).fetchall()[0]
+
+    def ListAll(self):
+        with self.connection:
+            return self.cursor.execute('SELECT * FROM "USERS"').fetchall()
     
     def Whois(self,username):
         with self.connection:
