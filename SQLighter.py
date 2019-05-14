@@ -23,13 +23,17 @@ class SQLighter:
         with self.connection:
            command = 'SELECT id FROM USERS WHERE id = "' +str(id)+'"'
            idresult = self.cursor.execute(command).fetchall()
-           command = 'SELECT username FROM USERS WHERE username = "' +str(username)+'"'
-           usernameresult = self.cursor.execute(command).fetchall()
         if len(idresult) == 0:
            self.AddUserFirstTime(id,username)
         else:
            command = 'UPDATE "USERS" SET "username" = "'+str(username)+'" WHERE "id" = "'+str(id)+'"'
            result = self.cursor.execute(command).fetchall()
+        return len(idresult)
+
+    def UserExistsInfo(self,username):
+        with self.connection:
+           command = 'SELECT username FROM USERS WHERE username = "' +str(username)+'"'
+           usernameresult = self.cursor.execute(command).fetchall()
         return len(usernameresult)
     
     def WhoAmI(self,id):

@@ -7,9 +7,13 @@ import telebot
 import time
 from datetime import datetime,timedelta
 
+global reg_notify
+reg_notify = True
+
+# this not using anymore
 def langlevel(level):
    result = '['+('#'*level) + ('-' *(5-level))+']'
-   return result
+   return results
 
 bot = telebot.TeleBot(config.token)	
 
@@ -25,6 +29,7 @@ bot = telebot.TeleBot(config.token)
 markuplang = telebot.types.InlineKeyboardMarkup()
 markuplevel = telebot.types.InlineKeyboardMarkup()
 markupgmt = telebot.types.InlineKeyboardMarkup()
+markupregister = telebot.types.InlineKeyboardMarkup()
 #create buttons for eng ru
 markuplang.row(
     telebot.types.InlineKeyboardButton("English", callback_data="lang=English"),
@@ -43,6 +48,11 @@ markuplevel.add(
 for j in range(-14,12,8):
     markupgmt.row(*[telebot.types.InlineKeyboardButton(str(i), callback_data="utc="+str(i)) for i in range(j,13,1)])
 
+#create button for register
+markupregister.add (
+    telebot.types.InlineKeyboardButton("Registration", url='http://t.me/lengrubot')  
+)
+
 @bot.message_handler(commands=['list'])
 def send_message(message):
     if message.from_user.id == 87250032:
@@ -60,37 +70,20 @@ def test_message(message):
 
 @bot.message_handler(commands=['rules'])
 def send_message(message):      
-        rules = ''' Hello!
-Both languages are allowed.
-Feel free to ask, if you do not understand something in a conversation.
-Don't be rude
-
-Only English chat (English practice for Russians): 
-@elish_practice
-Native speakers are welcomed here. Please help us, like we help you. Thank you.
-
-Оба языка разрешены.
-Спрашивайте, если что-то непонятно.
-Не будьте грубыми.
-Старайтесь уместить мысль в одно сообщение.
-
-Специально для русских: материться можно, но только если этого требует контекст разговора.
-#RULES
-
-================
-Bot added to chat. 
-write PM @lengrubot and press start to fill your profile. (or PM /start )
-/me - for info about you
-/info [nickname] - about anyone else.
-#bot_info
-================
-'''
-        bot.send_message(message.chat.id,rules)
+        bot.send_message(message.chat.id,config.rules)
 
 
 @bot.message_handler(commands=['me'])
 def send_messages(message):	
     db_worker = SQLighter(config.database_name)
+    if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
+            bot.send_message(
+                chat_id=message.chat.id, 
+                text="We would like to know what is your native language, please make a registration via our Bot.", 
+                reply_markup = markupregister,
+                reply_to_message_id = message.message_id 
+                )
+            return
     db_worker.UserExists(message.from_user.id, message.from_user.username)
     user_id, user_username, user_lang, user_level, user_UTC = db_worker.WhoAmI(message.from_user.id)
     db_worker.close()
@@ -116,7 +109,7 @@ def send_messages(message):
     username = message.text[6:len(message.text)]
     if username.startswith("@"): username = username[1:len(message.text)] 
     db_worker = SQLighter(config.database_name)
-    if db_worker.UserExists(message.from_user.id, username) != 0:
+    if db_worker.UserExistsInfo(username) != 0:
         user_id, user_username, user_lang, user_level, user_UTC = db_worker.Whois(username)
         #user_time = datetime.utcnow() + timedelta(hours=user_UTC)
         if user_UTC is None: 
@@ -131,10 +124,9 @@ def send_messages(message):
         else: other_lang = 'English' 
         response = '@'+str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
     else:
-        response = 'User '+username+ " does not exists."        
-    db_worker.close()
-    
-    bot.send_message(message.chat.id, response)
+        response = 'User '+username+ " does not exists."         
+    db_worker.close()  
+    bot.send_message(message.chat.id, str(response))
 
 @bot.callback_query_handler(func=lambda call:True)
 def callback_answer(callback_query: telebot.types.CallbackQuery): #И отвечаем на него
@@ -173,7 +165,31 @@ def callback_answer(callback_query: telebot.types.CallbackQuery): #И отвеч
         db_worker = SQLighter(config.database_name)
         db_worker.UpdateUserInfo(callback_query.from_user.id,'UTC',callback_query.data[4:])
         db_worker.close()
-    
+
+@bot.message_handler(commands=['reg'])
+def sendreg_message(message):      
+    global reg_notify
+    if message.from_user.id == 87250032:
+        if reg_notify is False: 
+            reg_notify = True 
+        else: 
+            reg_notify = False
+        bot.send_message(message.chat.id,"Notify about registration is "+str(reg_notify))
+
+@bot.message_handler(content_types=["text"])
+def checkall(message): 
+    global reg_notify
+    db_worker = SQLighter(config.database_name)
+    if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
+            bot.send_message(
+                chat_id=message.chat.id, 
+                text="We would like to know what is your native language, please make a registration via our Bot.", 
+                reply_markup = markupregister,
+                reply_to_message_id = message.message_id 
+                )
+    db_worker.close()
+
+
 
 if __name__ == '__main__':
     random.seed()
