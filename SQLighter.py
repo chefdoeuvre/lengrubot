@@ -43,6 +43,10 @@ class SQLighter:
     def ListAll(self):
         with self.connection:
             return self.cursor.execute('SELECT * FROM "USERS"').fetchall()
+
+    def ListLang(self,lang):
+        with self.connection:
+            return self.cursor.execute('SELECT id, UTC FROM "USERS" WHERE lang = ?', (lang,)).fetchall()
     
     def Whois(self,username):
         with self.connection:

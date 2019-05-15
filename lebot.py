@@ -5,10 +5,15 @@ import threading
 import config
 import telebot
 import time
+import re
 from datetime import datetime,timedelta
 
 global reg_notify
 reg_notify = True
+global english_only
+english_only = False
+global russian_only
+russian_only = False
 
 # this not using anymore
 def langlevel(level):
@@ -53,6 +58,33 @@ markupregister.add (
     telebot.types.InlineKeyboardButton("Registration", url='http://t.me/lengrubot')  
 )
 
+def WhoIsHere(message,lang):
+    db_worker = SQLighter(config.database_name)
+    Everyone = db_worker.ListLang(lang)
+    db_worker.close()
+    response = 'List of all registered '+lang+' native speakers \n Users count: '+ str(len(Everyone))+"\n"
+    for line in Everyone:
+        time = str((datetime.utcnow() + timedelta(hours=int(line[1]))).strftime("%H:%M"))
+        #print("=============== "+str(line[0]))
+        try: 
+            ufn = bot.get_chat_member(message.chat.id,str(line[0])).user.first_name
+            if ufn is not None: fullname=ufn
+            uln = bot.get_chat_member(message.chat.id,str(line[0])).user.last_name
+            if uln is not None: fullname=fullname+' '+uln
+        except:
+            fullname = bot.get_chat_member(message.chat.id,str(line[0])).user.username
+            pass
+        response = response+'['+time+'] '+fullname+'\n'
+    bot.send_message(message.chat.id, response)
+
+@bot.message_handler(commands=['le'])
+def send_message(message):
+    WhoIsHere(message,'English')
+
+@bot.message_handler(commands=['lr'])
+def send_message(message):
+    WhoIsHere(message,'Russian')
+
 @bot.message_handler(commands=['list'])
 def send_message(message):
     if message.from_user.id == 87250032:
@@ -95,10 +127,14 @@ def send_messages(message):
         user_level = "Unknown"
    # else:
     #    user_level = langlevel(user_level)
-    if user_username == "None":
-        user_username = str(message.from_user.first_name) + " "+ str(message.from_user.last_name)
-    else:
-        user_username = "@"+user_username
+#    if user_username == "None":
+    ufn = message.from_user.first_name
+    uln = message.from_user.last_name
+    if ufn != "None": user_username = ufn
+    if uln != "None": user_username = user_username+" "+uln
+    #user_username = str(message.from_user.first_name) + " "+ str(message.from_user.last_name)
+#    else:
+#        user_username = "@"+user_username
     if user_lang == 'English': other_lang = 'Russian' 
     else: other_lang = 'English' 
     response = str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
@@ -122,7 +158,11 @@ def send_messages(message):
         #    user_level = langlevel(user_level)
         if user_lang == 'English': other_lang = 'Russian' 
         else: other_lang = 'English' 
-        response = '@'+str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
+        ufn = bot.get_chat_member(message.chat.id,user_id).user.first_name
+        uln = bot.get_chat_member(message.chat.id,user_id).user.last_name
+        if ufn is not None: user_username = ufn
+        if uln is not None: user_username = user_username+" "+uln
+        response = str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
     else:
         response = 'User '+username+ " does not exists."         
     db_worker.close()  
@@ -166,6 +206,26 @@ def callback_answer(callback_query: telebot.types.CallbackQuery): #И отвеч
         db_worker.UpdateUserInfo(callback_query.from_user.id,'UTC',callback_query.data[4:])
         db_worker.close()
 
+@bot.message_handler(commands=['russianonly'])
+def sendreg_message(message):      
+    global russian_only
+    if message.from_user.id == 87250032:
+        if russian_only is False: 
+            russian_only = True 
+        else: 
+            russian_only = False
+        bot.send_message(message.chat.id,"Russian only mode is "+str(russian_only))
+
+@bot.message_handler(commands=['englishonly'])
+def sendreg_message(message):      
+    global english_only
+    if message.from_user.id == 87250032:
+        if english_only is False: 
+            english_only = True 
+        else: 
+            english_only = False
+        bot.send_message(message.chat.id,"English only mode is "+str(english_only))
+
 @bot.message_handler(commands=['reg'])
 def sendreg_message(message):      
     global reg_notify
@@ -179,6 +239,8 @@ def sendreg_message(message):
 @bot.message_handler(content_types=["text"])
 def checkall(message): 
     global reg_notify
+    global english_only
+    global russian_only
     db_worker = SQLighter(config.database_name)
     if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
             bot.send_message(
@@ -188,8 +250,14 @@ def checkall(message):
                 reply_to_message_id = message.message_id 
                 )
     db_worker.close()
-
-
+    if english_only is True:
+        e_words = round((len(re.findall('[a-zA-Z]', message.text)))/len(message.text),2)
+        if  e_words < 0.6:
+             bot.send_message(message.chat.id,"Hey! Today is English only day! ( " +str(e_words*100)+'% )'  ,reply_to_message_id = message.message_id ) 
+    elif russian_only is True:
+        r_words = round((len(re.findall('[а-яА-я]', message.text)))/len(message.text),2)
+        if  r_words < 0.6:
+             bot.send_message(message.chat.id,"Эй! Сегодня день русского языка! ( " +str(r_words*100)+'% )'  ,reply_to_message_id = message.message_id )
 
 if __name__ == '__main__':
     random.seed()
