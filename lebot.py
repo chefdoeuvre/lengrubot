@@ -14,6 +14,8 @@ global english_only
 english_only = False
 global russian_only
 russian_only = False
+global auto_langday
+auto_langday = False
 
 # this not using anymore
 def langlevel(level):
@@ -64,7 +66,10 @@ def WhoIsHere(message,lang):
     db_worker.close()
     response = 'List of all registered '+lang+' native speakers \n Users count: '+ str(len(Everyone))+"\n"
     for line in Everyone:
-        time = str((datetime.utcnow() + timedelta(hours=int(line[1]))).strftime("%H:%M"))
+        if line[1] is None: 
+            time = "Unknown"
+        else:
+            time = str((datetime.utcnow() + timedelta(hours=int(line[1]))).strftime("%H:%M"))
         #print("=============== "+str(line[0]))
         try: 
             ufn = bot.get_chat_member(message.chat.id,str(line[0])).user.first_name
@@ -130,8 +135,8 @@ def send_messages(message):
 #    if user_username == "None":
     ufn = message.from_user.first_name
     uln = message.from_user.last_name
-    if ufn != "None": user_username = ufn
-    if uln != "None": user_username = user_username+" "+uln
+    if ufn is not None: user_username = ufn
+    if uln is not None: user_username = user_username+" "+uln
     #user_username = str(message.from_user.first_name) + " "+ str(message.from_user.last_name)
 #    else:
 #        user_username = "@"+user_username
@@ -164,7 +169,7 @@ def send_messages(message):
         if uln is not None: user_username = user_username+" "+uln
         response = str(user_username)+' is '+str(user_lang)+' native speaker. '+other_lang+' level is '+str(user_level)+'. Current time: '+user_time
     else:
-        response = 'User '+username+ " does not exists."         
+        response = username+ " is wrong username or user does not have username."         
     db_worker.close()  
     bot.send_message(message.chat.id, str(response))
 
@@ -236,11 +241,23 @@ def sendreg_message(message):
             reg_notify = False
         bot.send_message(message.chat.id,"Notify about registration is "+str(reg_notify))
 
+@bot.message_handler(commands=['autolangday'])
+def sendreg_message(message):      
+    global auto_langday
+    if message.from_user.id == 87250032:
+        if auto_langday is False: 
+            auto_langday = True 
+        else: 
+            auto_langday = False
+        bot.send_message(message.chat.id,"Auto langday is "+str(auto_langday))
+
+
 @bot.message_handler(content_types=["text"])
 def checkall(message): 
     global reg_notify
     global english_only
     global russian_only
+    global auto_langday
     db_worker = SQLighter(config.database_name)
     if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
             bot.send_message(
@@ -250,14 +267,15 @@ def checkall(message):
                 reply_to_message_id = message.message_id 
                 )
     db_worker.close()
-    if english_only is True:
+    if (auto_langday is True and int(datetime.now().day)%2 == 0) or english_only is True:
         e_words = round((len(re.findall('[a-zA-Z]', message.text)))/len(message.text),2)
         if  e_words < 0.6:
-             bot.send_message(message.chat.id,"Hey! Today is English only day! ( " +str(e_words*100)+'% )'  ,reply_to_message_id = message.message_id ) 
-    elif russian_only is True:
+             bot.send_message(message.chat.id,"Hey! Today is English only day! ( " +str(e_words*100)+'% )',reply_to_message_id = message.message_id ) 
+    elif russian_only is True or (auto_langday is True and int(datetime.now().day)%2 != 0):
         r_words = round((len(re.findall('[а-яА-я]', message.text)))/len(message.text),2)
         if  r_words < 0.6:
-             bot.send_message(message.chat.id,"Эй! Сегодня день русского языка! ( " +str(r_words*100)+'% )'  ,reply_to_message_id = message.message_id )
+             bot.send_message(message.chat.id,"Эй! Сегодня день русского языка! ( " +str(r_words*100)+'% )',reply_to_message_id = message.message_id )
+
 
 if __name__ == '__main__':
     random.seed()
