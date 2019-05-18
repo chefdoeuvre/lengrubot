@@ -9,13 +9,17 @@ import re
 from datetime import datetime,timedelta
 
 global reg_notify
-reg_notify = True
+reg_notify = config.default_regnotify
 global english_only
 english_only = False
 global russian_only
 russian_only = False
 global auto_langday
-auto_langday = False
+auto_langday = config.default_autolangday
+global cooldown_nexttime
+cooldown_nexttime = datetime.now()
+global cooldown # in minutes
+cooldown = config.default_cooldown
 
 # this not using anymore
 def langlevel(level):
@@ -64,7 +68,7 @@ def WhoIsHere(message,lang):
     db_worker = SQLighter(config.database_name)
     Everyone = db_worker.ListLang(lang)
     db_worker.close()
-    response = 'List of all registered '+lang+' native speakers \n Users count: '+ str(len(Everyone))+"\n"
+    response = 'List of all registered '+lang+' native speakers \nUsers count: '+ str(len(Everyone))+"\n"
     for line in Everyone:
         if line[1] is None: 
             time = "Unknown"
@@ -111,7 +115,7 @@ def send_message(message):
 
 
 @bot.message_handler(commands=['me'])
-def send_messages(message):	
+def send_messages_me(message):	
     db_worker = SQLighter(config.database_name)
     if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
             bot.send_message(
@@ -148,6 +152,10 @@ def send_messages(message):
 @bot.message_handler(commands=['info'])
 def send_messages(message):
     username = message.text[6:len(message.text)]
+    if username == '' or username == "lengrubot":
+       send_messages_me(message)
+       return  
+    if len(username) > 50: return
     if username.startswith("@"): username = username[1:len(message.text)] 
     db_worker = SQLighter(config.database_name)
     if db_worker.UserExistsInfo(username) != 0:
@@ -183,7 +191,7 @@ def callback_answer(callback_query: telebot.types.CallbackQuery): #И отвеч
     if (callback_query.data).startswith("lang=") == True:
         bot.send_message(
             chat_id=callback_query.message.chat.id, 
-            text="Type your knowledge level of other language", 
+            text="Choose your knowledge level of other language", 
             reply_markup = markuplevel
             )
         #adduserlanguage if userexists
@@ -204,7 +212,7 @@ def callback_answer(callback_query: telebot.types.CallbackQuery): #И отвеч
     if (callback_query.data).startswith("utc=") == True:
         bot.send_message(
             chat_id=callback_query.message.chat.id, 
-            text="Thank you! You can try '/me' command."
+            text="Thank you! You can try /me command here or in the group."
             )  
         #adduserUTC
         db_worker = SQLighter(config.database_name)
@@ -249,7 +257,39 @@ def sendreg_message(message):
             auto_langday = True 
         else: 
             auto_langday = False
-        bot.send_message(message.chat.id,"Auto langday is "+str(auto_langday))
+        bot.send_message(message.chat.id,"Autolangday is "+str(auto_langday))
+
+@bot.message_handler(commands=['today'])
+def sendreg_message(message):      
+    global english_only
+    global russian_only
+    timenow = (datetime.now()).strftime("%H:%M")
+    if int(datetime.now().day)%2 == 0 or english_only is True:
+        bot.send_message(
+            chat_id = message.chat.id,
+            text = 'Today is "English" day or english_only is enabled.\nСегодня день английского языка или этот режим был включен принудительно.\nServer time: '+timenow,
+            reply_to_message_id = message.message_id
+            )
+    elif int(datetime.now().day)%2 != 0 or russian_only is True:
+        bot.send_message(
+            chat_id = message.chat.id,
+            text = 'Today is "Russian" day or russian_only is enabled.\nСегодня день русского языка или этот режим был включен принудительно.\nServer time: '+timenow,
+            reply_to_message_id = message.message_id
+            )
+    else:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text='autolangday is disabled.',
+            reply_to_message_id = message.message_id
+            )
+
+@bot.message_handler(commands=['cooldown'])
+def sendreg_message(message):      
+    global cooldown
+    global cooldown_nexttime
+    if message.from_user.id == 87250032:
+        if len(message.text) > 10: cooldown = int(message.text[10:len(message.text)])
+        bot.send_message(message.chat.id,"Cooldown = "+str(cooldown)+" minutes\n cooldown_nexttime = "+ cooldown_nexttime.strftime("%H:%M") + "\n datetime now = "+ datetime.now().strftime("%H:%M"))
 
 
 @bot.message_handler(content_types=["text"])
@@ -258,6 +298,8 @@ def checkall(message):
     global english_only
     global russian_only
     global auto_langday
+    global cooldown
+    global cooldown_nexttime
     db_worker = SQLighter(config.database_name)
     if db_worker.UserExists(message.from_user.id,message.from_user.username) == 0 and reg_notify is True:
             bot.send_message(
@@ -267,15 +309,16 @@ def checkall(message):
                 reply_to_message_id = message.message_id 
                 )
     db_worker.close()
-    if (auto_langday is True and int(datetime.now().day)%2 == 0) or english_only is True:
-        e_words = round((len(re.findall('[a-zA-Z]', message.text)))/len(message.text),2)
-        if  e_words < 0.6:
-             bot.send_message(message.chat.id,"Hey! Today is English only day! ( " +str(e_words*100)+'% )',reply_to_message_id = message.message_id ) 
-    elif russian_only is True or (auto_langday is True and int(datetime.now().day)%2 != 0):
-        r_words = round((len(re.findall('[а-яА-я]', message.text)))/len(message.text),2)
-        if  r_words < 0.6:
-             bot.send_message(message.chat.id,"Эй! Сегодня день русского языка! ( " +str(r_words*100)+'% )',reply_to_message_id = message.message_id )
-
+    if ((auto_langday is True and int(datetime.now().day)%2 == 0) or english_only is True) and (datetime.now() > cooldown_nexttime):
+        ru_letters = round((len(re.findall('[а-яА-Я]', message.text)))/len(message.text),2)
+        if  ru_letters > 0.4:
+             bot.send_message(message.chat.id,"Hey! Today is English only day! ( " +str(ru_letters*100)+'% of Russian letters in the message.)',reply_to_message_id = message.message_id ) 
+             cooldown_nexttime = datetime.now() + timedelta(minutes=cooldown)
+    elif (russian_only is True or (auto_langday is True and int(datetime.now().day)%2 != 0))  and (datetime.now() > cooldown_nexttime):
+        en_letters = round((len(re.findall('[a-zA-Z]', message.text)))/len(message.text),2)
+        if  en_letters > 0.4:
+             bot.send_message(message.chat.id,"Эй! Сегодня день русского языка! ( " +str(en_letters*100)+'% английских букв в сообщении.)',reply_to_message_id = message.message_id )
+             cooldown_nexttime = datetime.now() + timedelta(minutes=cooldown)
 
 if __name__ == '__main__':
     random.seed()
