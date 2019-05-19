@@ -35,7 +35,7 @@ class SQLighter:
            command = 'SELECT username FROM USERS WHERE username = "' +str(username)+'"'
            usernameresult = self.cursor.execute(command).fetchall()
         return len(usernameresult)
-    
+
     def WhoAmI(self,id):
         with self.connection:
             return self.cursor.execute('SELECT * FROM "USERS" WHERE id = ?', (id,)).fetchall()[0]
@@ -47,11 +47,10 @@ class SQLighter:
     def ListLang(self,lang):
         with self.connection:
             return self.cursor.execute('SELECT id, UTC FROM "USERS" WHERE lang = ?', (lang,)).fetchall()
-    
+
     def Whois(self,username):
         with self.connection:
             return self.cursor.execute('SELECT * FROM "USERS" WHERE username = ?', (username,)).fetchall()[0]
-            
+
     def close(self):
-        #""" ��������� ������� ���������� � �� """
         self.connection.close()
