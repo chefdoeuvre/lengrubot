@@ -11,6 +11,8 @@ levels = [
   "C1",
   "C2"
 ]
+russian_days = [0, 2, 4]
+english_days = [1, 3]
 database_name = 'people.db'
 default_cooldown = 2
 default_autolangday = True

@@ -5,7 +5,7 @@ import random
 import config
 import time
 import re
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta, date
 
 from SQLighter import SQLighter
 import messages as msgs
@@ -28,13 +28,21 @@ def isRussianDay():
     """Проверка "русский" ли сегодня день"""
     global russian_only
     global auto_langday
-    return (auto_langday and int(datetime.now().day)%2 != 0) or russian_only
+    if russian_only:
+        return True
+    if auto_langday:
+        return date.today().weekday() in config.russian_days
+    return False
 
 def isEnglishDay():
     """Проверка "английский" ли сегодня день"""
     global english_only
     global auto_langday
-    return (auto_langday and int(datetime.now().day)%2 == 0) or english_only
+    if english_only:
+        return True
+    if auto_langday:
+        return date.today().weekday() in config.english_days
+    return False
 
 def ratioOfRussian(txt):
     """ Доля кириллицы ко всем буквам в тексте. """
