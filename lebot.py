@@ -38,15 +38,15 @@ def isEnglishDay():
 
 def ratioOfRussian(txt):
     """ Доля кириллицы ко всем буквам в тексте. """
-    ratio = len(re.findall('[а-яА-Я]', txt)) / len(re.findall('[а-яА-Яa-zA-Z]', txt))
-    print(ratio)
-    return ratio
+    tlc = len(re.findall('[а-яА-Я]', txt))
+    alc = len(re.findall('[а-яА-Яa-zA-Z]', txt))
+    return tlc/alc if alc > 0 else 0
 
 def ratioOfEnglish(txt):
     """ Доля латиницы ко всем буквам в тексте. """
-    ratio = len(re.findall('[a-zA-Z]', txt)) / len(re.findall('[а-яА-Яa-zA-Z]', txt))
-    print(ratio)
-    return ratio
+    tlc = len(re.findall('[a-zA-Z]', txt))
+    alc = len(re.findall('[а-яА-Яa-zA-Z]', txt))
+    return tlc/alc if alc > 0 else 0
 
 def adminonly(func):
     """Декоратор, для команд работающих только из под админа."""
@@ -308,6 +308,13 @@ def sendreg_message(message):
     global cooldown_nexttime
     if len(message.text) > 10: cooldown = int(message.text[10:len(message.text)])
     bot.send_message(message.chat.id,"Cooldown = "+str(cooldown)+" minutes\n cooldown_nexttime = "+ cooldown_nexttime.strftime("%H:%M") + "\n datetime now = "+ datetime.now().strftime("%H:%M"))
+
+@bot.message_handler(commands=['reset_cooldown'])
+@adminonly
+def reset_cooldown(message):
+    global cooldown_nexttime
+    cooldown_nexttime = datetime.now()
+    bot.send_message(message.chat.id, "Cooldown's been reseted")
 
 @bot.message_handler(content_types=["text"])
 def checkall(message):
